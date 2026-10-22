@@ -11,7 +11,10 @@ Sophifold drives toward the cube, unfolds both shells, picks up the cube on its 
 - Play/Pause/Resume and Restart, with 1×, 1.5× and 2× playback.
 - Manual folding limits: base 0–90°, upper 0–180°. Fully folded is 0% and 0° on both joints.
 - Original Fusion mounting alignment follows the upper folding shell; the arm uses base yaw and pitch joints for lateral transfer.
-- Component inspection, isolation, screw folder visibility, camera presets, edges, grid, PNG capture, English/Chinese and themes.
+- A compact playback bar, fullscreen mode and an on-demand Explore parts inspector.
+- Five component groups: Chassis & drive, Folding mechanism, Robotic arm, Electronics and Fasteners. Each supports group visibility, readable labels and original CAD-name search.
+- Component inspection, isolation, camera presets, edges, grid, PNG capture, English/Chinese and themes.
+- Product explanation, supplied physical prototype folding video, and approximate CAD pose dimensions (668 × 421 × 537 mm folded; 1,229 mm upright height with the arm at rest).
 
 This is a visual mechanism preview. Physical motor travel, timing, contact forces and mechanical clearances are not certified.
 
@@ -37,6 +40,6 @@ The GitHub Actions workflow tests, builds and deploys `dist` after pushes to `ma
 
 The supplied STEP was tessellated locally with Native OpenCascade 8.0.1. The published model contains 99 selectable groups and 1,049,847 triangles. Dimensions use millimeters. Source coordinates map `(x,y,z)` to display `(z,x,y)`, with display Z up.
 
-The original STEP and local conversion environments are not included. The browser-ready mesh, compressed alternative, component metadata, motor segmentation and brand assets are in `public/assets`. Metadata records source SHA-256 `35cedb91e7ff22e99381a46e2c737b588098e51cb2d13bacc65fca7bdb9417d1`.
+The original STEP and local conversion environments are not included. The browser-ready mesh, compressed alternative, component metadata, motor segmentation, supplied reference video and brand assets are in `public/assets`. Metadata records source SHA-256 `35cedb91e7ff22e99381a46e2c737b588098e51cb2d13bacc65fca7bdb9417d1`.
 
 Conversion helpers in `scripts` preserve geometry. New assembly revisions also need stable component mapping and hinge/arm calibration before replacing the assets. Folding and the arm mount share the same rigid transform to preserve the Fusion mating relationship.

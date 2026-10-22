@@ -2,11 +2,11 @@ import './style.css';
 import {openingPercent,openingAngles,internalJointAngle} from './motion-display.js';
 import {CUBE_HOME} from './pickup-demo.js';
 import {AssemblyViewer} from './viewer.js';
-import {filterComponents,isScrewComponent} from './model-data.js';
+import {componentGroups,componentGroup,componentLabel,matchingComponents} from './component-catalog.js';
 import {t,initLanguage} from './i18n.js';
 
 const $=selector=>document.querySelector(selector);
-let viewer,meta,selectedId=null,loadState='loading',theme='system',screwFolderOpen=false;
+let viewer,meta,selectedId=null,loadState='loading',theme='system',openGroups=new Set();
 try{theme=localStorage.getItem('sv3-theme')||'system'}catch{}
 $('#theme').value=theme;
 const media=matchMedia('(prefers-color-scheme: dark)');
@@ -17,25 +17,25 @@ media.addEventListener('change',applyTheme);applyTheme();
 function createPartRow(part){
  const row=document.createElement('div');row.className='component-row'+(part.id===selectedId?' selected':'');row.dataset.id=part.id;
  const check=document.createElement('input');check.type='checkbox';check.checked=viewer.parts[part.id]?.visible??true;
- check.setAttribute('aria-label',`${t('show')} ${part.name}`);check.onchange=()=>viewer.setVisible(part.id,check.checked);
- const button=document.createElement('button');button.textContent=part.name;button.title=part.name;button.setAttribute('aria-pressed',String(part.id===selectedId));button.onclick=()=>viewer.select(part.id);
+ check.setAttribute('aria-label',`${t('show')} ${componentLabel(part,t)}`);check.onchange=()=>viewer.setVisible(part.id,check.checked);
+ const button=document.createElement('button');button.textContent=componentLabel(part,t);button.title=part.name;button.setAttribute('aria-pressed',String(part.id===selectedId));button.onclick=()=>viewer.select(part.id);
  row.append(check,button);return row;
 }
-function createScrewFolder(matchingScrews){
- const allScrews=meta.meshes.filter(isScrewComponent);
- const visibleCount=allScrews.filter(p=>viewer.parts[p.id].visible).length;
+function createComponentFolder(group,matchingParts,forceOpen){
+ const allParts=meta.meshes.filter(p=>componentGroup(p)===group),expanded=forceOpen||openGroups.has(group);
+ const visibleCount=allParts.filter(p=>viewer.parts[p.id].visible).length;
  const folder=document.createElement('div');folder.className='component-folder';
  const header=document.createElement('div');header.className='folder-header';
- const toggle=document.createElement('button');toggle.className='folder-label';toggle.dataset.focusKey='screw-folder';toggle.setAttribute('aria-expanded',String(screwFolderOpen));toggle.setAttribute('aria-controls','screw-children');
+ const toggle=document.createElement('button');toggle.className='folder-label';toggle.dataset.focusKey=group+'-folder';toggle.setAttribute('aria-expanded',String(expanded));toggle.setAttribute('aria-controls',group+'-children');
  toggle.innerHTML='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg>';
- const title=document.createElement('span');title.textContent=t('screwFolder');toggle.append(title);
- toggle.onclick=()=>{screwFolderOpen=!screwFolderOpen;renderList();};
- const count=document.createElement('span');count.className='folder-count';count.textContent=`${visibleCount}/${allScrews.length}`;
- const visibility=document.createElement('button');visibility.className='folder-visibility';visibility.dataset.focusKey='screw-visibility';visibility.textContent=t(visibleCount?'hideShort':'showShort');visibility.setAttribute('aria-label',t(visibleCount?'hideGroup':'showGroup'));
- visibility.onclick=()=>viewer.setGroupVisible(allScrews.map(p=>p.id),visibleCount===0);
+ const title=document.createElement('span');title.textContent=t('group_'+group);toggle.append(title);
+ toggle.onclick=()=>{if(openGroups.has(group))openGroups.delete(group);else openGroups.add(group);renderList();};
+ const count=document.createElement('span');count.className='folder-count';count.textContent=`${visibleCount}/${allParts.length}`;
+ const visibility=document.createElement('button');visibility.className='folder-visibility';visibility.dataset.focusKey=group+'-visibility';visibility.textContent=t(visibleCount?'hideShort':'showShort');visibility.setAttribute('aria-label',`${t(visibleCount?'hide':'show')} ${t('group_'+group)}`);
+ visibility.onclick=()=>viewer.setGroupVisible(allParts.map(p=>p.id),visibleCount===0);
  header.append(toggle,count,visibility);folder.append(header);
- const children=document.createElement('div');children.id='screw-children';children.className='folder-children';children.hidden=!screwFolderOpen;
- if(screwFolderOpen)matchingScrews.forEach(p=>children.append(createPartRow(p)));
+ const children=document.createElement('div');children.id=group+'-children';children.className='folder-children';children.hidden=!expanded;
+ if(expanded)matchingParts.forEach(p=>children.append(createPartRow(p)));
  folder.append(children);return folder;
 }
 function renderList(){
@@ -43,23 +43,30 @@ function renderList(){
  const list=$('#component-list'),scrollTop=list.scrollTop,focused=document.activeElement;
  const focusedId=focused?.closest('.component-row')?.dataset.id,focusKey=focused?.dataset.focusKey;
  const focusedType=focused?.tagName==='INPUT'?'input':'button';
- const query=$('#search').value;
- const folderMatches=query.trim()&&t('screwFolder').toLowerCase().includes(query.trim().toLowerCase());
- const parts=meta.meshes.filter(p=>filterComponents([p],query).length||(folderMatches&&isScrewComponent(p)));
+ const query=$('#search').value,parts=matchingComponents(meta.meshes,query,t);
  $('#component-count').textContent=parts.length===meta.meshes.length?parts.length:`${parts.length} / ${meta.meshes.length}`;
  list.replaceChildren();
  if(!parts.length){const empty=document.createElement('p');empty.className='list-empty';empty.textContent=t('empty');list.append(empty);return;}
- const fragment=document.createDocumentFragment(),screws=parts.filter(isScrewComponent);
- if(screws.length)fragment.append(createScrewFolder(screws));
- parts.filter(p=>!isScrewComponent(p)).forEach(p=>fragment.append(createPartRow(p)));
- list.append(fragment);list.scrollTop=scrollTop;
+ for(const group of componentGroups){const matching=parts.filter(p=>componentGroup(p)===group);if(matching.length)list.append(createComponentFolder(group,matching,!!query.trim()));}
+ list.scrollTop=scrollTop;
  if(focusedId!==undefined)list.querySelector(`[data-id="${focusedId}"] ${focusedType}`)?.focus({preventScroll:true});
  else if(focusKey)list.querySelector(`[data-focus-key="${focusKey}"]`)?.focus({preventScroll:true});
 }
+function setPartsOpen(open){
+ $('#assembly-panel').hidden=!open;$('#workspace').classList.toggle('parts-open',open);$('#explore-parts').setAttribute('aria-expanded',String(open));
+}
+$('#explore-parts').onclick=()=>setPartsOpen($('#assembly-panel').hidden);
+$('#close-parts').onclick=()=>{setPartsOpen(false);$('#explore-parts').focus();};
+$('#assembly-panel').addEventListener('keydown',e=>{if(e.key==='Escape'){$('#close-parts').click();}});
+const workspace=$('#workspace');
+function syncFullscreen(){const active=document.fullscreenElement===workspace;$('#fullscreen').textContent=t(active?'exitFullscreen':'fullscreen');$('#fullscreen').setAttribute('aria-pressed',String(active));}
+$('#fullscreen').hidden=!document.fullscreenEnabled;
+$('#fullscreen').onclick=async()=>{try{if(document.fullscreenElement===workspace)await document.exitFullscreen();else await workspace.requestFullscreen();}catch{syncFullscreen();}};
+document.addEventListener('fullscreenchange',syncFullscreen);
 function updateStatus(){
  if(!meta)return;
  $('#model-status').textContent=t('ready');$('#mesh-status').textContent=`${viewer.parts.filter(p=>p.visible).length} / ${meta.meshes.length} ${t('parts')}`;
- $('#selected-name').textContent=selectedId===null?t('noSelection'):meta.meshes.find(m=>m.id===selectedId).name;
+ $('#selected-name').textContent=selectedId===null?t('noSelection'):componentLabel(meta.meshes.find(m=>m.id===selectedId),t);
 }
 function updateFoldUI(){
  if(!viewer)return;
@@ -89,14 +96,14 @@ $('#edges').onchange=e=>viewer?.setEdges(e.target.checked);$('#snapshot').onclic
 function setView(name){viewer?.setView(name);document.querySelectorAll('[data-view]').forEach(b=>{b.classList.toggle('active',b.dataset.view===name);b.setAttribute('aria-pressed',String(b.dataset.view===name));});}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>setView(b.dataset.view));
 $('#reset').onclick=()=>{viewer?.resetPickup();viewer?.setFoldProgress(1);viewer?.restoreDefaultVisibility();viewer?.select(null);setView('iso');};
-document.addEventListener('languagechange',()=>{renderList();updateStatus();updateFoldUI();updatePickupUI();if(loadState==='error'){$('#loading-title').textContent=t('error');$('#loading-detail').textContent=t('errorDetail');$('#model-status').textContent=t('error');}});
+document.addEventListener('languagechange',()=>{renderList();updateStatus();updateFoldUI();updatePickupUI();syncFullscreen();if(loadState==='error'){$('#loading-title').textContent=t('error');$('#loading-detail').textContent=t('errorDetail');$('#model-status').textContent=t('error');}});
 initLanguage();
 async function start(){
  loadState='loading';meta=null;selectedId=null;$('#isolate').disabled=true;$('#status-dot').className='';$('#loading').hidden=false;$('#loading').classList.remove('error');$('#retry').hidden=true;$('#progress').value=0;$('#loading-title').textContent=t('loading');$('#loading-detail').textContent=t('loadingDetail');
  document.querySelectorAll('.demo-controls button,.demo-controls select,.motion-controls button,.motion-controls input,.motion-controls select,.joint-controls input,.pickup-controls button').forEach(c=>c.disabled=true);
  try{
   viewer?.dispose();viewer=new AssemblyViewer($('#viewport'));
-  viewer.addEventListener('selection',e=>{if(!meta)return;selectedId=e.detail?.id??null;if(selectedId!==null&&isScrewComponent(meta.meshes[selectedId]))screwFolderOpen=true;$('#isolate').disabled=selectedId===null;renderList();updateStatus();});
+  viewer.addEventListener('selection',e=>{if(!meta)return;selectedId=e.detail?.id??null;if(selectedId!==null){openGroups.add(componentGroup(meta.meshes[selectedId]));setPartsOpen(true);}$('#isolate').disabled=selectedId===null;renderList();updateStatus();});
   viewer.addEventListener('visibility',()=>{renderList();updateStatus();});
   viewer.addEventListener('foldchange',updateFoldUI);viewer.addEventListener('pickupchange',updatePickupUI);
   viewer.addEventListener('orbit',()=>{document.querySelectorAll('[data-view]').forEach(b=>{b.classList.remove('active');b.setAttribute('aria-pressed','false')});});

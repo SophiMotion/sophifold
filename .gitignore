@@ -1,0 +1,10 @@
+node_modules/
+dist/
+brand-reference/
+*.tar.gz
+
+.cad-python/
+cad-raw.json
+
+model-update/
+.video-python/
